@@ -1,0 +1,50 @@
+# (c) Copyright 2016 DataNexus Inc.  All Rights Reserved.
+#
+# install openshift
+---
+- set_fact: install_dir=/usr/local/src
+  
+# - block:
+#
+#   # we use the HTTPS protocol instead of SSH because it's a public repo without authentication
+#   - name: OPENSHIFT OVERLAY | cloning {{ source_package }}.git
+#     git:
+#       repo: "https://{{ source_package }}.git"
+#       update: no
+#       dest: "{{ install_dir | default(playbook_dir) }}/{{ source_package }}"
+#       version: "{{ application_version }}"
+#
+#   - name: OPENSHIFT OVERLAY | applying fixes to {{ source_package }}.git
+#     lineinfile:
+#       regexp: '^openshift_additional_repos'
+#       path: "{{ install_dir | default(playbook_dir) }}/{{ source_package }}/inventory/hosts.localhost"
+#       insertafter: '^openshift_node_groups'
+#       line: "openshift_additional_repos=[{'id': 'centos-okd-ci', 'name': 'centos-okd-ci', 'baseurl' :'https://rpms.svc.ci.openshift.org/openshift-origin-v3.11', 'gpgcheck' :'0', 'enabled' :'1'}]"
+#
+#   - name: OPENSHIFT OVERLAY | starting NetworkManager service
+#     service:
+#       name: NetworkManager
+#       state: started
+#
+#   become: yes
+
+  
+- name:  OPENSHIFT OVERLAY | installing openshift origin v{{ origin_version }}
+  unarchive:
+    src: "https://github.com/openshift/origin/releases/download/v3.11.0/openshift-origin-client-tools-v{{ origin_version }}-linux-64bit.tar.gz"
+    dest: /usr/local/bin
+    remote_src: yes
+  become: yes
+# - block:
+#
+#   - name: OPENSHIFT OVERLAY | installing {{ source_package }} prerequisites
+#     command: /usr/bin/ansible-playbook -i inventory/hosts.localhost playbooks/prerequisites.yml
+#     args:
+#       chdir: "{{ install_dir | default(playbook_dir) }}/{{ source_package }}"
+#
+#   # - name: OPENSHIFT OVERLAY | deploying {{ source_package }} cluster
+# #     command: /usr/bin/ansible-playbook -i inventory/hosts.localhost playbooks/deploy_cluster.yml
+# #     args:
+# #       chdir: "{{ install_dir | default(playbook_dir) }}/{{ source_package }}"
+#
+#   become: yes

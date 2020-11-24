@@ -1,0 +1,8 @@
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+---
+application: openshift
+application_version: "{{ application }}-ansible-3.11.35-1"
+ansible_source_package: "github.com/{{ application }}/{{ application }}-ansible"
+origin_version: 3.11.0-0cbc58b
+docker_version: 18.06.1.ce-3
+

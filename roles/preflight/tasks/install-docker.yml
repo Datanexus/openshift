@@ -1,0 +1,32 @@
+# (c) Copyright 2016 DataNexus Inc.  All Rights Reserved.
+#
+# install docker packages
+---
+- block:
+  
+  - name: OPENSHIFT DOCKER OVERLAY | adding docker repo
+    command: yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+
+  - name: OPENSHIFT DOCKER OVERLAY | installing docker community
+    yum:
+      name: "docker-ce-{{ docker_version }}.el7"
+      update_cache: yes
+
+  # this is necessary to use the ansible docker controls
+  - name: OPENSHIFT DOCKER OVERLAY | installing docker python API client
+    yum:
+      name: docker-python
+
+  - name: OPENSHIFT DOCKER OVERLAY | allowing insecure registry connections for openshift
+    lineinfile:
+      path: /lib/systemd/system/docker.service
+      regexp: '^ExecStart=/usr/bin/dockerd'
+      line: 'ExecStart=/usr/bin/dockerd --insecure-registry 172.30.0.0/16'
+  
+  - name: OPENSHIFT DOCKER OVERLAY | starting docker service
+    service:
+      name: docker
+      state: started
+
+  become: true
+  when: ansible_distribution == 'CentOS'

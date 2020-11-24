@@ -1,0 +1,18 @@
+# (c) Copyright 2016 DataNexus Inc.  All Rights Reserved.
+#
+# install openshift prereq packages
+---
+# openshift requires anisble post 2.4 and pre 2.7
+- set_fact: ansible_packages="['git','https://releases.ansible.com/ansible/rpm/release/epel-7-x86_64/ansible-2.6.6-1.el7.ans.noarch.rpm','pyOpenSSL','python-cryptography','python-lxml','NetworkManager']"
+
+- block:
+  
+  - name: OPENSHIFT OVERLAY | installing prerequisite packages
+    package:
+      name: "{{ item }}"
+      state: present
+    with_items:
+      - "{{ ansible_packages }}"
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+  
+  become: yes
