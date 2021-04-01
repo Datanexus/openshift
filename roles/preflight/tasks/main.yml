@@ -1,0 +1,51 @@
+# (c) Copyright 2016 DataNexus Inc.  All Rights Reserved.
+#
+# install datanexus ssh api server
+---
+- block:
+  
+  - name: SSH API OVERLAY | installing git
+    package:
+      name: "{{ item }}"
+      state: present
+    with_items:
+      - git
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+    
+  become: yes
+    
+# we use the SSH protocol rather than HTTPS because it's a private repo that needs authentication
+- name: SSH API OVERLAY | cloning {{ source_package }}.git
+  git:
+    repo: "ssh://git@{{ source_package }}.git"
+    update: yes
+    dest: "{{ gopath }}/src/{{ source_package }}"
+
+# the environment section doesn't work so set it manually for commands...sigh...maybe a templated shell script   
+- name: SSH API OVERLAY | installing go dep
+  shell: "GOPATH={{ gopath }} /usr/local/go/bin/go get -u github.com/golang/dep/cmd/dep"
+
+# its safe to ignore errors around the manifest already existing for idempotency
+- name: SSH API OVERLAY | intializing dependencies
+  shell: "GOPATH={{ gopath }} {{ gopath }}/bin/dep init"
+  args:
+    chdir: "{{ gopath }}/src/{{ source_package }}"
+  ignore_errors: yes
+
+- name: SSH API OVERLAY | ensuring dependencies are present
+  shell: "GOPATH={{ gopath }} {{ gopath }}/bin/dep ensure"
+  args:
+    chdir: "{{ gopath }}/src/{{ source_package }}"
+
+- name: SSH API OVERLAY | building binary
+  shell: "GOPATH={{ gopath }} /usr/local/go/bin/go install"
+  args:
+    chdir: "{{ gopath }}/src/{{ source_package }}"
+
+- name: SSH API OVERLAY | enable ssh api server
+  systemd:
+    name: ssh-apiserver
+    state: started
+    enabled: yes
+    daemon_reload: yes
+  become: yes

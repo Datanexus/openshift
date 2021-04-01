@@ -1,0 +1,243 @@
+#!/usr/bin/env ansible-playbook
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+#
+# main routine for provisioning openshift
+---
+- name: OPENSHIFT OVERLAY | discovering {{ cloud }} networking
+  tags:
+    - openshift
+    - vm
+  hosts: localhost
+  connection: local
+  vars_files:
+    - vars/openshift.yml
+  gather_facts: no
+  tasks:
+    - include_vars: "{{ configuration }}"
+      when: configuration is defined
+
+    - include_role:
+        name: aws
+        tasks_from: discover-vpc
+      when: cloud == 'aws'
+
+    - include_role:
+        name: azure
+        tasks_from: discover-resourcegroup
+      when: cloud == 'azure'
+
+- name: OPENSHIFT OVERLAY | creating {{ cloud }} security groups
+  tags:
+    - openshift
+    - vm
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  tasks:
+    - include_vars: "{{ configuration }}"
+      when: configuration is defined
+
+    - include_role:
+        name: aws
+        tasks_from: create-securitygroup
+      when: cloud == 'aws'
+
+- name: OPENSHIFT OVERLAY | launching VM
+  tags: vm
+  vars_files:
+    - vars/openshift.yml
+  hosts: localhost
+  connection: local
+  gather_facts: yes
+  tasks:
+    - include_vars: "{{ configuration }}"
+      when: configuration is defined
+
+    - include_role:
+        name: aws
+        tasks_from: launch-vm
+      when: cloud == 'aws'
+
+    - include_role:
+        name: osp
+        tasks_from: launch-vm
+      when: cloud == 'osp'
+
+    - include_role:
+        name: azure
+        tasks_from: launch-vm
+      when: cloud == 'azure'
+
+- name: OPENSHIFT OVERLAY | applying {{ cloud }} security groups
+  tags:
+    - openshift
+  hosts: localhost
+  connection: local
+  vars_files:
+    - vars/openshift.yml
+  gather_facts: yes
+  tasks:
+    - include_vars: "{{ configuration }}"
+      when: configuration is defined
+
+    - include_role:
+        name: aws
+        tasks_from: apply-securitygroup
+      when: cloud == 'aws'
+
+    - include_role:
+        name: azure
+        tasks_from: modify-existing-securitygroup
+      when: cloud == 'azure'
+
+- name: OPENSHIFT OVERLAY | gathering {{ cloud }} inventory
+  tags:
+    - openshift
+    - vm
+  hosts: localhost
+  connection: local
+  vars_files:
+    - vars/openshift.yml
+  gather_facts: no
+  tasks:
+    - include_vars: "{{ configuration }}"
+      when: configuration is defined
+
+    - include_role:
+        name: aws
+        tasks_from: discover-vm
+      when: cloud == 'aws'
+    
+    - include_role:
+        name: azure
+        tasks_from: discover-vm
+      when: cloud == 'azure'
+
+# this is a separate step because ansible needs to gather facts on a fully configured base system
+- name: OPENSHIFT OVERLAY | completing OS configuration
+  hosts: openshift
+  tags: vm
+  vars_files:
+    - vars/openshift.yml
+  gather_facts: yes
+  tasks:
+    - include_vars: "{{ configuration }}"
+      when: configuration is defined
+
+    - include_role:
+        name: preflight
+  
+    - include_role:
+        name: http-proxy
+      when: http_proxy is defined
+
+# - name: OPENSHIFT OVERLAY | pulling down official openshift installer
+#   tags:
+#     - openshift
+#   hosts: localhost
+#   connection: local
+#   vars_files:
+#     - vars/openshift.yml
+#   gather_facts: no
+#   tasks:
+#     - include_vars: "{{ configuration }}"
+#       when: configuration is defined
+#
+#     - include_role:
+#         name: preflight
+#         tasks_from: install-openshift
+      
+- name: OPENSHIFT OVERLAY | installing base openshift application
+  tags:
+    - vm
+    - openshift
+  hosts: openshift
+  vars_files:
+    - vars/openshift.yml
+  gather_facts: yes
+  tasks:
+    - include_vars: "{{ configuration }}"
+      when: configuration is defined
+
+    # - include_role:
+#         name: preflight
+#         tasks_from: install-packages
+    
+    # this seems to be handled via the openshift install
+    - include_role:
+        name: preflight
+        tasks_from: install-docker
+    
+    - include_role:
+        name: openshift
+#
+# - name: OPENSHIFT OVERLAY MASTER | configuring master
+#   tags:
+#     - vm
+#     - openshift
+#   hosts: openshift_master
+#   gather_facts: no
+#   vars_files:
+#     - vars/openshift.yml
+#   tasks:
+#     - include_vars: "{{ configuration }}"
+#       when: configuration is defined
+#
+#     - include_role:
+#         name: master-streaming
+#       when:
+#         - groups['openshift_replica'] is defined
+#         - groups['openshift_replica'] | length > 0
+#
+# - name: OPENSHIFT OVERLAY REPLICA | configuring replica
+#   tags:
+#     - vm
+#     - openshift
+#   hosts: openshift_replica
+#   gather_facts: no
+#   vars_files:
+#     - vars/openshift.yml
+#   tasks:
+#     - include_vars: "{{ configuration }}"
+#       when: configuration is defined
+#
+#     - include_role:
+#         name: replica-streaming
+#       when:
+#         - groups['openshift_master'] is defined
+#         - groups['openshift_master'] | length > 0
+#
+# - name: OPENSHIFT OVERLAY MASTER | staging data
+#   tags:
+#     - vm
+#     - openshift
+#   hosts: openshift_master
+#   gather_facts: no
+#   vars_files:
+#     - vars/openshift.yml
+#   tasks:
+#     - include_vars: "{{ configuration }}"
+#       when: configuration is defined
+#
+#     - block:
+#
+#       - name: OPENSHIFT OVERLAY MASTER | checking if {{ datafile }} exists
+#         stat:
+#           path: "{{ datafile }}"
+#         register: sqlscript
+#
+#       - name: OPENSHIFT OVERLAY MASTER | uploading {{ datafile }}
+#         copy:
+#           src: "{{ datafile }}"
+#           dest: "/home/{{ user }}/{{ datafile }}"
+#           owner: "{{ user }}"
+#           group: "{{ user }}"
+#           mode: 0600
+#         when: sqlscript.stat.exists
+#
+#       - name: OPENSHIFT OVERLAY MASTER | executing {{ datafile }}
+#         command: /usr/bin/psql -f /home/{{ user }}/{{ datafile }}
+#         when: sqlscript.stat.exists
+#
+#       when:
+#         - datafile is defined
